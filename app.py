@@ -1,11 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
+import pubchempy as pcp
+import wikipedia
 
 # Set page config
 st.set_page_config(page_title="Chemical Reaction Simulator", page_icon="⚗️")
 
-# Class: ChemicalReactionSimulator with Streamlit Integration
+# --- Chemical Simulator Class ---
 class ChemicalReactionSimulator:
     def __init__(self):
         self.reactions = []
@@ -55,6 +57,29 @@ class ChemicalReactionSimulator:
             data["Yield (%)"].append(yield_percent)
         self.reaction_df = pd.DataFrame(data)
 
+    def get_product_info(self, product_name):
+        try:
+            compounds = pcp.get_compounds(product_name, 'name')
+            if not compounds:
+                return {"Error": "Compound not found."}
+            c = compounds[0]
+            return {
+                "IUPAC Name": c.iupac_name,
+                "Molecular Formula": c.molecular_formula,
+                "Molecular Weight": c.molecular_weight,
+                "Canonical SMILES": c.canonical_smiles,
+                "Is Likely a Solvent?": "Yes" if "solvent" in str(c.synonyms).lower() else "Possibly No",
+                "Synonyms": c.synonyms[:5] if c.synonyms else []
+            }
+        except Exception as e:
+            return {"Error": str(e)}
+
+    def get_wikipedia_summary(self, chemical):
+        try:
+            return wikipedia.summary(chemical, sentences=2)
+        except:
+            return "No Wikipedia summary found."
+
     def plot_reactions(self):
         if self.reaction_df.empty:
             st.warning("No reactions to plot.")
@@ -74,10 +99,10 @@ class ChemicalReactionSimulator:
 
         st.pyplot(fig)
 
-# --- Streamlit App Logic ---
-st.title("⚗️ Chemical Reaction Simulator")
-
+# --- App Logic ---
 simulator = ChemicalReactionSimulator()
+
+st.title("⚗️ Chemical Reaction Simulator")
 
 st.sidebar.header("Input Reaction Parameters")
 reactants = st.sidebar.text_input("Reactants (e.g., H2 + O2)")
@@ -85,7 +110,6 @@ temperature = st.sidebar.number_input("Temperature (°C)", value=25.0)
 pressure = st.sidebar.number_input("Pressure (atm)", value=1.0)
 catalyst = st.sidebar.text_input("Catalyst (optional)")
 
-# Validation
 valid_input = True
 if temperature < -273.15:
     st.sidebar.error("Temperature must be above absolute zero.")
@@ -108,8 +132,23 @@ else:
     st.subheader("🧪 Reaction Predictions Table")
     st.dataframe(simulator.reaction_df)
 
-    csv = simulator.reaction_df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Results as CSV", csv, "reactions.csv", "text/csv")
+    st.download_button("📥 Download Results as CSV",
+                       simulator.reaction_df.to_csv(index=False).encode('utf-8'),
+                       "reactions.csv", "text/csv")
 
     st.subheader("📊 Reaction Visualizations")
     simulator.plot_reactions()
+
+    # Product Info Section
+    st.subheader("🔍 Chemical Product Lookup")
+    selected_product = st.selectbox("Select a product to learn more", simulator.reaction_df["Products"].unique())
+
+    with st.expander(f"ℹ️ Details for {selected_product}"):
+        pubchem_info = simulator.get_product_info(selected_product)
+        wiki_summary = simulator.get_wikipedia_summary(selected_product)
+
+        st.markdown("**PubChem Data:**")
+        st.json(pubchem_info)
+
+        st.markdown("**Wikipedia Summary:**")
+        st.info(wiki_summary)

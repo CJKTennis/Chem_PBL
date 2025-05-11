@@ -2,6 +2,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
+# Set page config
+st.set_page_config(page_title="Chemical Reaction Simulator", page_icon="⚗️")
+
 # Class: ChemicalReactionSimulator with Streamlit Integration
 class ChemicalReactionSimulator:
     def __init__(self):
@@ -82,19 +85,31 @@ temperature = st.sidebar.number_input("Temperature (°C)", value=25.0)
 pressure = st.sidebar.number_input("Pressure (atm)", value=1.0)
 catalyst = st.sidebar.text_input("Catalyst (optional)")
 
+# Validation
+valid_input = True
+if temperature < -273.15:
+    st.sidebar.error("Temperature must be above absolute zero.")
+    valid_input = False
+if pressure < 0:
+    st.sidebar.error("Pressure must be non-negative.")
+    valid_input = False
+
 if st.sidebar.button("Add Reaction"):
-    if reactants:
+    if reactants and valid_input:
         simulator.add_reaction(reactants, temperature, pressure, catalyst)
         simulator.simulate_reactions()
         st.success("Reaction added and simulated.")
-    else:
+    elif not reactants:
         st.warning("Please enter reactants.")
 
 if simulator.reaction_df.empty:
     st.info("Add a reaction using the sidebar to see results.")
 else:
-    st.subheader("Reaction Predictions Table")
+    st.subheader("🧪 Reaction Predictions Table")
     st.dataframe(simulator.reaction_df)
 
-    st.subheader("Reaction Visualizations")
+    csv = simulator.reaction_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download Results as CSV", csv, "reactions.csv", "text/csv")
+
+    st.subheader("📊 Reaction Visualizations")
     simulator.plot_reactions()
